@@ -187,21 +187,17 @@ public:
         vector<thread> threads1;
         for (int indexI = 0; indexI < rows; indexI++) {
             if (indexI == i) {
+                k--;
                 continue;
             }
-            
-            threads1.emplace_back([this, indexI, j, &matrix, &f, &k] {
+            threads1.emplace_back([this, indexI, j, &matrix, f, k] () mutable {
                 for (int indexJ = 0; indexJ < columns; indexJ++) {
                     if (indexJ == j) {
+                        f--;
                         continue;
                     }
-                    cout << "Поток: " << this_thread::get_id() << " k: " << k << " f: " << f << endl;
-                    cout << "indexI: " << indexI << " indexJ: " << indexJ << endl;
-                    matrix.matr[k][f] = matr[indexI][indexJ];
-                    f++;
+                    matrix.matr[indexI+k][indexJ+f] = matr[indexI][indexJ];
                 }
-            k++;
-            f = 0;
             });
         }
         for (auto &thread : threads1) {
@@ -314,8 +310,12 @@ int main() {
     Matrix<double> A("A", rows, columns);
     cout << "Введите матрицу A: " << endl;
     cin >> A;
-    Matrix M = A.getMinor(1, 3);
+    /*Matrix M = A.getMinor(4, 2);
     cout << M << endl;
+    Matrix t = M.transpose();
+    cout << "T: " << endl;
+    cout << t << endl;*/
+    cout << "Determinant A: " << A.getDet() << endl;
     /*//Умножение матрицы на число
     Matrix C = A * 5;
     cout << "Матрица С: " << endl;
