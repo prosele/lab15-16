@@ -4,6 +4,8 @@
 #include <vector>
 #include <thread>
 #include <future>
+#include <algorithm>
+#include <cmath>
 using namespace std;
 
 template <typename T>
@@ -63,6 +65,17 @@ public:
         FileMatrix.close();
     }
     
+    /*int determineBlockSize() {
+        int blockSize;
+        int numCPU = thread::hardware_concurrency();
+        if (rows <= numCPU) {
+            blockSize = rows;
+        }
+        else {
+            
+        }
+    }*/
+    
     // Для ввода матрицы из консоли
     void input(istream &is) {
         for (int i = 0; i < rows; ++i) {
@@ -99,6 +112,31 @@ public:
         }
         return sum;
     }
+    
+    // Сложение, используя фьючерс
+    Matrix blockSum(const Matrix & other, int blockSize) {
+        if (rows != other.rows || columns != other.columns) {
+            throw "Введены матрицы разного размера, сложение невозможно";
+        }
+        Matrix sum("sum", rows, columns);
+        vector<future<void>> futures;
+        for (int i = 0; i < rows; i += blockSize) {
+            for (int j = 0; j < columns; j += blockSize) {
+                futures.push_back(async(launch::async, [i, j, blockSize, this, &other, &sum] {
+                    for (int indexI = i; indexI < min(i+blockSize, rows); indexI++) {
+                        for (int indexJ = j; indexJ < min(j+blockSize, columns); indexJ++) {
+                            sum.matr[indexI][indexJ] = matr[indexI][indexJ] + other.matr[indexI][indexJ];
+                        }
+                    }
+                }));
+            }
+        }
+        for (auto &future : futures) {
+            future.get();
+        }
+        return sum;
+    }
+    
     // Перегрузка оператора -
     Matrix operator -(const Matrix & other) {
         if (rows != other.rows || columns != other.columns) {
@@ -119,6 +157,30 @@ public:
         return dif;
     }
     
+    // Вычитание, используя фьючерс
+    Matrix blockDif(const Matrix & other, int blockSize) {
+        if (rows != other.rows || columns != other.columns) {
+            throw "Введены матрицы разного размера, вычитание невозможно";
+        }
+        Matrix dif("dif", rows, columns);
+        vector<future<void>> futures;
+        for (int i = 0; i < rows; i += blockSize) {
+            for (int j = 0; j < columns; j += blockSize) {
+                futures.emplace_back(async(launch::async, [i, j, this, &dif, &other, blockSize] {
+                    for (int indexI = i; indexI < min(i+blockSize, rows); indexI++) {
+                        for (int indexJ = j; indexJ < min(j+blockSize, columns); indexJ++) {
+                            dif.matr[indexI][indexJ] = matr[indexI][indexJ] - other.matr[indexI][indexJ];
+                        }
+                    }
+                }));
+            }
+        }
+        for (auto &future : futures) {
+            future.get();
+        }
+        return dif;
+    }
+    
     // Перегрузка оператора * для умножения матриц
     Matrix operator *(const Matrix & other) {
         if (columns != other.rows) {
@@ -129,7 +191,7 @@ public:
             for (int i = 0; i < rows; i++) {
                 threads.emplace_back([this, &other, i, &multi] {
                     for (int j = 0; j < other.columns; j++) {
-                        int summa = 0;
+                        T summa = 0;
                         for (int k = 0; k < columns; k++) {
                             summa += matr[i][k] * other.matr[k][j];
                         }
@@ -143,6 +205,36 @@ public:
         }
         return multi;
     }
+    
+    // Умножение на матрицу, используя фьючерс
+    Matrix blockMulti(const Matrix & other, int blockSize) {
+        if (columns != other.rows) {
+            throw "Такие матрицы нельзя перемножить, так как количество столбцов первой матрицы не равно количеству строк второй матрицы";
+        }
+        Matrix multi("multi", rows, other.columns);
+        vector<future<void>> futures;
+        for (int i = 0; i < rows; i += blockSize) {
+            for (int j = 0; j < other.columns; j += blockSize) {
+                futures.emplace_back(async(launch::async, [i, j, this, &other, &multi, blockSize] {
+                    for (int indexI = i; indexI < min(i+blockSize, rows); indexI++) {
+                        for (int indexJ = j; j < min(j+blockSize, other.columns); indexJ++) {
+                            T summa = 0;
+                            for (int k = 0; k < columns; k++) {
+                                summa += matr[indexI][k] * other.matr[k][indexJ];
+                            }
+                            multi.matr[indexI][indexJ] = summa;
+                            summa = 0;
+                        }
+                    }
+                }));
+            }
+        }
+        for (auto &future : futures) {
+            future.get();
+        }
+        return multi;
+    }
+    
     //Перегрузка оператора * для умножения матрицы на число
     Matrix operator *(T sc) {
         Matrix multi("multi", rows, columns);
@@ -159,6 +251,28 @@ public:
         }
         return multi;
     }
+    
+    // Умножение на число, используя фьючерс
+    Matrix blockMultiSc (T sc, int blockSize) {
+        Matrix multi("multi", rows, columns);
+        vector<future<void>> futures;
+        for (int i = 0; i < rows; i += blockSize) {
+            for (int j = 0; j < columns; j += blockSize) {
+                futures.emplace_back(async(launch::async, [sc, i, j, this, &multi, blockSize] {
+                    for (int indexI = i; indexI < min(i+blockSize, rows); indexI++) {
+                        for (int indexJ = j; indexJ < min(j+blockSize, columns); indexJ++) {
+                            multi.matr[indexI][indexJ] = sc * matr[indexI][indexJ];
+                        }
+                    }
+                }));
+            }
+        }
+        for (auto &future : futures) {
+            future.get();
+        }
+        return multi;
+    }
+    
     //Перегрузка оператора присваивания
     Matrix& operator=(const Matrix &m) {
         rows = m.rows;
@@ -205,6 +319,7 @@ public:
         }
         return matrix;
     }
+      
     // Определитель
     double getDet() {
         if (rows != columns) {
@@ -230,6 +345,34 @@ public:
         }
         return res;
     }
+    
+    // Определитель, используя фьючерсы
+    double blockGetDet(int blockSize) {
+        if (rows != columns) {
+            throw "Невозможно найти определитель матрицы, так как она не квадратная";
+        }
+        if (rows == 1) {
+            return matr[0][0];
+        }
+        if (rows == 2) {
+            return matr[0][0]*matr[1][1]  - matr[0][1]*matr[1][0];
+        }
+        double res = 0.0;
+        vector<future<void>> futures;
+        for (int j = 0; j < columns; j += blockSize) {
+            futures.push_back(async(launch::async, [&, blockSize, j] {
+                for (int indexJ = j; indexJ < min(j+blockSize, columns); indexJ++) {
+                    Matrix M = getMinor(1, indexJ + 1);
+                    res += (indexJ % 2 == 0 ? 1 : -1) * M.blockGetDet(blockSize)*matr[0][indexJ];
+                }
+            }));
+        }
+        for (auto &future : futures) {
+            future.get();
+        }
+        return res;
+    }
+    
     //Транспонирование
     Matrix transpose() {
         Matrix transpose("transpose", columns, rows);
@@ -246,6 +389,28 @@ public:
         }
         return transpose;
     }
+    
+    // Транспонирование, используя фьючерсы
+    Matrix blockTranspose(int blockSize) {
+        Matrix transpose("transpose", columns, rows);
+        vector<future<void>> futures;
+        for (int i = 0; i < rows; i += blockSize) {
+            for (int j = 0; j < columns; j += blockSize) {
+                futures.emplace_back(async(launch::async, [=, this, &transpose] {
+                    for (int indexI = i; indexI < min(i+blockSize, rows); indexI++) {
+                        for (int indexJ = j; indexJ < min(j+blockSize, columns); indexJ++) {
+                            transpose.matr[indexJ][indexI] = matr[indexI][indexJ];
+                        }
+                    }
+                }));
+            }
+        }
+        for (auto &future : futures) {
+            future.get();
+        }
+        return transpose;
+    }
+    
     //Поиск обратной матрицы
     Matrix operator!() {
         Matrix current("curr", rows, columns);
@@ -262,46 +427,104 @@ public:
             current.matr[0][0] = 1/current.matr[0][0];
             return current;
         }
+        vector<thread> threads;
         if (rows > 1) {
             for (int i = 0; i < rows; i++) {
-                for (int j = 0; j < columns; j++) {
-                    minor.matr[i][j] = ((i + j) % 2 == 0? 1 : -1) * getMinor(i + 1, j + 1).getDet();
-                }
+                threads.emplace_back([i, this, &minor] {
+                    for (int j = 0; j < columns; j++) {
+                        minor.matr[i][j] = ((i + j) % 2 == 0? 1 : -1) * getMinor(i + 1, j + 1).getDet();
+                    }
+                });
+            }
+            for (auto &thread : threads) {
+                thread.join();
             }
         }
         Matrix inverse = minor.transpose() * (1 / current.getDet());
         return inverse;
     }
-    //Нулевая матрица заданного размера
-    static Matrix zero(int Rows, int Columns) {
-        Matrix zero("zero", Rows, Columns);
-        for (int i = 0; i < Rows; i++) {
-            for (int j = 0; j < Columns; j++) {
-                zero.matr[i][j] = 0;
+    
+    // Поиск обратной матрицы, используя фьючерсы
+    Matrix blockInverce(int blockSize) {
+        Matrix current("curr", rows, columns);
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < columns; j++) {
+                current.matr[i][j] = matr[i][j];
             }
+        }
+        if (columns != rows || current.getDet() == 0) {
+            throw "Матрица должна быть квадратной и невырожденной";
+        }
+        Matrix minor("minor", rows, columns);
+        if (rows == 1 && columns == 1) {
+            current.matr[0][0] = 1/current.matr[0][0];
+            return current;
+        }
+        vector<future<void>> futures;
+        for (int i = 0; i < rows; i += blockSize) {
+            futures.emplace_back(async(launch::async, [this, i, blockSize, &minor] {
+                for (int indexI = i; indexI < min(i+blockSize, rows); indexI++) {
+                    for (int indexJ = 0; indexJ < columns; indexJ++) {
+                        minor.matr[indexI][indexJ] = ((indexI + indexJ) % 2 == 0? 1 : -1) * getMinor(indexI + 1, indexJ + 1).blockGetDet(blockSize);
+                    }
+                }
+            }));
+        }
+        for (auto &future : futures) {
+            future.get();
+        }
+        Matrix inverse = minor.blockTranspose(blockSize) * (1 / current.blockGetDet(blockSize));
+        return inverse;
+    }
+    
+    //Нулевая матрица заданного размера
+    static Matrix zero(int Rows, int Columns, int blockSize) {
+        Matrix zero("zero", Rows, Columns);
+        vector<future<void>> futures;
+        for (int i = 0; i < Rows; i += blockSize) {
+            for (int j = 0; j < Columns; j += blockSize) {
+                futures.emplace_back(async(launch::async, [=, &zero] {
+                    for (int indexI = i; indexI < min(i+blockSize, Rows); indexI++) {
+                        for (int indexJ = j; indexJ < min(j+blockSize, Columns); indexJ++) {
+                            zero.matr[indexI][indexJ] = 0;
+                        }
+                    }
+                }));
+            }
+        }
+        for (auto &future : futures) {
+            future.get();
         }
         return zero;
     }
     //Единичная матрица заданного размера
-    static Matrix id(int Rows, int Columns) {
+    static Matrix id(int Rows, int Columns, int blockSize) {
         Matrix id("id", Rows, Columns);
-        for (int i = 0; i < Rows; i++) {
-            for (int j = 0; j < Columns; j++) {
-                if (i == j) {
-                    id.matr[i][j] = 1;
-                }
-                else {
-                    id.matr[i][j] = 0;
-                }
+        vector<future<void>> futures;
+        for (int i = 0; i < Rows; i += blockSize) {
+            for (int j = 0; j < Columns; j += blockSize) {
+                futures.emplace_back(async(launch::async, [=, &id] {
+                    for (int indexI = i; indexI < min(i+blockSize, Rows); indexI++) {
+                        for (int indexJ = j; indexJ < min(j+blockSize, Columns); indexJ++) {
+                            if (indexI == indexJ) {
+                                id.matr[indexI][indexJ] = 1;
+                            }
+                            else {
+                                id.matr[indexI][indexJ] = 0;
+                            }
+                        }
+                    }
+                }));
             }
+        }
+        for (auto &future : futures) {
+            future.get();
         }
         return id;
     }
 };
     
 int main() {
-    
-    
     int rows, columns;
     cout << "Введите количество строк матрицы А:" << endl;
     cin >> rows;
@@ -310,13 +533,18 @@ int main() {
     Matrix<double> A("A", rows, columns);
     cout << "Введите матрицу A: " << endl;
     cin >> A;
+    Matrix C = A.blockInverce(2);
+    cout << "Result: " << endl;
+    cout << C;
     /*Matrix M = A.getMinor(4, 2);
     cout << M << endl;
     Matrix t = M.transpose();
     cout << "T: " << endl;
-    cout << t << endl;*/
-    cout << "Determinant A: " << A.getDet() << endl;
-    /*//Умножение матрицы на число
+    cout << t << endl;
+    cout << "Обратная к A: " << endl;
+    Matrix A2 = !A;
+    cout << A2;
+    //Умножение матрицы на число
     Matrix C = A * 5;
     cout << "Матрица С: " << endl;
     cout << C;
