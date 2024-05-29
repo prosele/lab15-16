@@ -6,6 +6,8 @@
 #include <future>
 #include <algorithm>
 #include <cmath>
+#include <chrono>
+#include <ctime>
 using namespace std;
 
 template <typename T>
@@ -35,6 +37,11 @@ public:
         columns = obj.columns;
         matr = obj.matr;
     }
+    
+    void setValue(int row, int column, T value) {
+        matr[row][column] = value;
+    }
+    
     // Функция inputfile(string fname) записывает в матрицу данные из файла
     void inputfile(string fname) {
         FileMatrix.open(fname);
@@ -64,17 +71,6 @@ public:
     ~Matrix() {
         FileMatrix.close();
     }
-    
-    /*int determineBlockSize() {
-        int blockSize;
-        int numCPU = thread::hardware_concurrency();
-        if (rows <= numCPU) {
-            blockSize = rows;
-        }
-        else {
-            
-        }
-    }*/
     
     // Для ввода матрицы из консоли
     void input(istream &is) {
@@ -217,7 +213,7 @@ public:
             for (int j = 0; j < other.columns; j += blockSize) {
                 futures.emplace_back(async(launch::async, [i, j, this, &other, &multi, blockSize] {
                     for (int indexI = i; indexI < min(i+blockSize, rows); indexI++) {
-                        for (int indexJ = j; j < min(j+blockSize, other.columns); indexJ++) {
+                        for (int indexJ = j; indexJ < min(j+blockSize, other.columns); indexJ++) {
                             T summa = 0;
                             for (int k = 0; k < columns; k++) {
                                 summa += matr[indexI][k] * other.matr[k][indexJ];
@@ -452,7 +448,7 @@ public:
                 current.matr[i][j] = matr[i][j];
             }
         }
-        if (columns != rows || current.getDet() == 0) {
+        if (columns != rows || current.blockGetDet(blockSize) == 0) {
             throw "Матрица должна быть квадратной и невырожденной";
         }
         Matrix minor("minor", rows, columns);
@@ -525,7 +521,60 @@ public:
 };
     
 int main() {
-    int rows, columns;
+    srand(static_cast<unsigned int> (time(NULL)));
+    int blockSize = 0;
+    /*for (int i = 0; i <= 1500; i += 50) {
+        Matrix<double> A("A", i, i), B("B", i, i);
+        for (int indexI = 0; indexI < i; indexI++) {
+            for (int indexJ = 0; indexJ < i; indexJ++) {
+                A.setValue(indexI, indexJ, rand()%100+1);
+                B.setValue(indexI, indexJ, rand()%100+1);
+            }
+        }
+        auto start = chrono::high_resolution_clock::now();
+        Matrix C = A.blockMulti(B, blockSize);
+        auto end = chrono::high_resolution_clock::now();
+        auto duration = end - start;
+        auto iMillis = chrono::duration_cast<chrono::milliseconds>(duration);
+        cout << "Размер матриц: " << i << " * " << i << ". Время выполнения: " << iMillis.count() << endl;
+        blockSize += 10;
+    }*/
+    /*for (int i = 2; i <= 8; i += 2) {
+        blockSize = i/2;
+        Matrix<double> A("A", i, i);
+        for (int indexI = 0; indexI < i; indexI++) {
+            for (int indexJ = 0; indexJ < i; indexJ++) {
+                A.setValue(indexI, indexJ, rand()%100+1);
+            }
+        }
+        
+        try {
+            auto start = chrono::high_resolution_clock::now();
+            Matrix C = A.blockInverce(blockSize);
+            auto end = chrono::high_resolution_clock::now();
+            auto duration = end - start;
+            auto iMillis = chrono::duration_cast<chrono::milliseconds>(duration);
+            cout << "Размер матриц: " << i << " * " << i << ". Время выполнения: " << iMillis.count() << endl;
+        }
+        catch (const char* errorMessage) {
+            cout << errorMessage << endl;
+        }
+        blockSize += 1;
+    }*/
+    /*Matrix<double> A("A",6,6);
+    for (int i = 0; i < 6; i++) {
+        for (int j = 0; j < 6; j++) {
+            A.setValue(i, j, rand()%100+1);
+            
+        }
+    }
+    auto start = chrono::high_resolution_clock::now();
+    Matrix C = !A;
+    auto end = chrono::high_resolution_clock::now();
+    auto duration = end - start;
+    auto iMillis = chrono::duration_cast<chrono::milliseconds>(duration);
+    cout << iMillis.count() << endl;*/
+    /*int rows, columns;
     cout << "Введите количество строк матрицы А:" << endl;
     cin >> rows;
     cout << "Введите количество столбцов матрицы А:" << endl;
@@ -533,86 +582,15 @@ int main() {
     Matrix<double> A("A", rows, columns);
     cout << "Введите матрицу A: " << endl;
     cin >> A;
+    auto start = chrono::high_resolution_clock::now();
     Matrix C = A.blockInverce(2);
-    cout << "Result: " << endl;
-    cout << C;
-    /*Matrix M = A.getMinor(4, 2);
-    cout << M << endl;
-    Matrix t = M.transpose();
-    cout << "T: " << endl;
-    cout << t << endl;
-    cout << "Обратная к A: " << endl;
-    Matrix A2 = !A;
-    cout << A2;
-    //Умножение матрицы на число
-    Matrix C = A * 5;
-    cout << "Матрица С: " << endl;
-    cout << C;
-    //Поиск обратной матрицы
-    try {
-        Matrix<double> F = !A;
-        cout << "Обратная к матрице А: " << endl;
-        cout << F;
-    }
-    catch (const char* ErrorMessage) {
-        cout << ErrorMessage << endl;
-    }
-    //Сложение двух матриц
-    try {
-        Matrix P = A + C;
-        cout << "Матрица P: " << endl;
-        cout << P;
-    }
-    catch (const char* ErrorMessage) {
-        cout << ErrorMessage << endl;
-    }
-    //Вычитание двух матриц
-    try {
-        Matrix Q = A - C;
-        cout << "Матрица Q: " << endl;
-        cout << Q;
-    }
-    catch (const char* ErrorMessage) {
-        cout << ErrorMessage << endl;
-    }
-    //Умножение двух матриц
-    try {
-        Matrix D = A * C;
-        cout << "Матрица D: " << endl;
-        cout << D;
-    }
-    catch (const char* ErrorMessage) {
-        cout << ErrorMessage << endl;
-    }
-    //Работа с файлами
-    string fname = "";
-    cout << "Введите название вашего файла:" << endl;
-    cin >> fname;
-    ifstream file;
-    file.open(fname);
-    if (!file.is_open()) {
-        cout << "Файл с матрицей B не открыт" << endl;
-    }
-    else {
-        cout << "Файл с матрицей B открыт" << endl;
-    }
-    int characters = 0;
-    int lines = 0;
-    string line;
-    while (getline(file, line)) {
-        for (int i = 0; i < line.length(); i++) {
-            if (line[i] != ' ' && line[i] != '-') {
-                characters++;
-            }
-        }
-        lines++;
-    }
-    Matrix<int> B("B", lines, (characters - 1) / lines, fname);
-    cout << B;
-    string nameoffile;
-    cout << "Куда записать матрицу B? " << endl;
-    cin >> nameoffile;
-    B.outputfile(nameoffile);
-    file.close();*/
+    auto end = chrono::high_resolution_clock::now();
+    chrono::duration<float> duration = end-start;
+    auto start1 = chrono::high_resolution_clock::now();
+    Matrix C1 = !A;
+    auto end1 = chrono::high_resolution_clock::now();
+    auto dur1 = end1 - start1;
+    auto i_millis = std::chrono::duration_cast<std::chrono::milliseconds>(dur1);
+    cout << duration.count() << " " << i_millis.count() << endl;*/
     return 0;
 }
