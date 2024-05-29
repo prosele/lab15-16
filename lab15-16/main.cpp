@@ -561,36 +561,34 @@ int main() {
         }
         blockSize += 1;
     }*/
-    /*Matrix<double> A("A",6,6);
-    for (int i = 0; i < 6; i++) {
-        for (int j = 0; j < 6; j++) {
-            A.setValue(i, j, rand()%100+1);
-            
+    /*for (int thread = 1; thread <= 8; thread++) {
+        Matrix<double> A("A", 1680, 1680), B("B", 1680, 1680);
+        for (int indexI = 0; indexI < 1680; indexI++) {
+            for (int indexJ = 0; indexJ < 1680; indexJ++) {
+                A.setValue(indexI, indexJ, rand()%100+1);
+                B.setValue(indexI, indexJ, rand()%100+1);
+            }
         }
-    }
-    auto start = chrono::high_resolution_clock::now();
-    Matrix C = !A;
-    auto end = chrono::high_resolution_clock::now();
-    auto duration = end - start;
-    auto iMillis = chrono::duration_cast<chrono::milliseconds>(duration);
-    cout << iMillis.count() << endl;*/
-    /*int rows, columns;
-    cout << "Введите количество строк матрицы А:" << endl;
-    cin >> rows;
-    cout << "Введите количество столбцов матрицы А:" << endl;
-    cin >> columns;
-    Matrix<double> A("A", rows, columns);
-    cout << "Введите матрицу A: " << endl;
-    cin >> A;
-    auto start = chrono::high_resolution_clock::now();
-    Matrix C = A.blockInverce(2);
-    auto end = chrono::high_resolution_clock::now();
-    chrono::duration<float> duration = end-start;
-    auto start1 = chrono::high_resolution_clock::now();
-    Matrix C1 = !A;
-    auto end1 = chrono::high_resolution_clock::now();
-    auto dur1 = end1 - start1;
-    auto i_millis = std::chrono::duration_cast<std::chrono::milliseconds>(dur1);
-    cout << duration.count() << " " << i_millis.count() << endl;*/
+        auto start = chrono::high_resolution_clock::now();
+        Matrix C = A.blockMulti(B, 1680/thread);
+        auto end = chrono::high_resolution_clock::now();
+        auto duration = end - start;
+        auto iMillis = chrono::duration_cast<chrono::milliseconds>(duration);
+        cout << "Количество потоков: " << thread << ". Время выполнения: " << iMillis.count() << endl;
+    }*/
+    /*for (int thread = 1; thread <= 8; thread++) {
+        Matrix<double> A("A", 6, 6);
+        for (int indexI = 0; indexI < 6; indexI++) {
+            for (int indexJ = 0; indexJ < 6; indexJ++) {
+                A.setValue(indexI, indexJ, rand()%100+1);
+            }
+        }
+        auto start = chrono::high_resolution_clock::now();
+        Matrix C = A.blockInverce(thread);
+        auto end = chrono::high_resolution_clock::now();
+        auto duration = end - start;
+        auto iMillis = chrono::duration_cast<chrono::milliseconds>(duration);
+        cout << "Количество потоков: " << thread << ". Время выполнения: " << iMillis.count() << endl;
+    }*/
     return 0;
 }
